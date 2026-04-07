@@ -12,7 +12,7 @@
     "prisma": "npx prisma generate",
     "prisma:u": "npx prisma db push",
     "prisma:studio": "npx prisma studio",
-    "start": "node dist/main",
+    "start": "node dist/src/main",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:local": "nest start",
     "start:debug": "nest start --debug --watch",
