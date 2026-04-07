@@ -1,0 +1,574 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider     = "mongodb"
+  url          = env("MONGO_DB_URL")
+  relationMode = "prisma"
+}
+
+enum access {
+  level_1
+  level_2
+  level_3
+  level_4
+  level_5
+}
+
+enum user_type {
+  user
+  client
+  admin
+}
+
+enum subscription {
+  free
+  standard
+  premium
+}
+
+enum permissions {
+  read
+  write
+  delete
+}
+
+enum scope {
+  facebook
+  google
+  manual
+  two_factor
+  sms
+  mail
+}
+
+enum status {
+  active
+  disabled
+}
+
+enum auth {
+  login
+  password
+  register
+  two_factor
+  smtp
+  payment
+}
+
+enum two_factor_type {
+  sms
+  app
+  mail
+}
+
+enum verify_registration_type {
+  sms
+  mail_token
+  mail_link
+}
+
+model User {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  first_name String? @default("")
+  last_name  String? @default("")
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  ip_address String? @default("")
+  email      String
+  password   String?
+  status     status  @default(active)
+  verified   Boolean @default(false)
+  photo      String? @default("")
+
+  scope       scope[]       @default([manual])
+  permissions permissions[] @default([read, write, delete])
+  access      access        @default(level_1)
+
+  two_factor_type two_factor_type?
+  totp_secret     String?          @default("")
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String   @db.ObjectId
+
+  organization          Organization?      @relation(fields: [organization_id], references: [id])
+  organization_id       String?            @db.ObjectId
+  organization_token    OrganizationToken? @relation(fields: [organization_token_id], references: [id])
+  organization_token_id String?            @db.ObjectId
+
+  facebook   Facebook[]
+  google     Google[]
+  sms        Sms[]
+  mail       Mail[]
+  two_factor TwoFactor[]
+  manual     Manual[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Client {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  first_name String? @default("")
+  last_name  String? @default("")
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  ip_address String? @default("")
+  email      String  @unique
+  password   String?
+  status     status  @default(active)
+  verified   Boolean @default(false)
+  photo      String? @default("")
+
+  scope scope[] @default([manual])
+
+  two_factor_type two_factor_type? @default(app)
+  totp_secret     String?          @default("")
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String?  @db.ObjectId
+
+  facebook    Facebook[]
+  google      Google[]
+  sms         Sms[]
+  mail        Mail[]
+  two_factor  TwoFactor[]
+  manual      Manual[]
+  association Association[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("clients")
+}
+
+model Admin {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  first_name String? @default("")
+  last_name  String? @default("")
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  ip_address String? @default("")
+  email      String  @unique
+  password   String?
+  status     status  @default(active)
+  verified   Boolean @default(false)
+  photo      String? @default("")
+
+  scope       scope[]       @default([manual])
+  permissions permissions[] @default([read, write, delete])
+  access      access        @default(level_4)
+
+  two_factor_type two_factor_type? @default(app)
+  totp_secret     String?          @default("")
+
+  facebook   Facebook[]
+  google     Google[]
+  sms        Sms[]
+  mail       Mail[]
+  two_factor TwoFactor[]
+  manual     Manual[]
+  blog       Blog[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("admins")
+}
+
+model Company {
+  id              String  @id @default(auto()) @map("_id") @db.ObjectId
+  default_card_id String? @db.ObjectId
+  photo           String? @default("")
+  bio             String? @default("")
+  name            String?
+  email           String  @unique
+  status          status  @default(active)
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  verified        Boolean @default(false)
+  save_cards      Boolean @default(false)
+
+  app_key    AppKey @relation(fields: [app_key_id], references: [id])
+  app_key_id String @unique @db.ObjectId
+
+  service_email       ServiceMail[]
+  association         Association[]
+  client              Client[]
+  user                User[]
+  organization        Organization[]
+  organization_token  OrganizationToken[]
+  transaction         Transaction[]
+  card                Card[]
+  authorization_token AuthorizationToken[]
+  subscription        Subscription[]
+  wallet              Wallet?              @relation(fields: [wallet_id], references: [id])
+  wallet_id           String               @unique @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model Subscription {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  amount       Int          @default(0)
+  subscription subscription
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String   @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Association {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  verified Boolean @default(false)
+  creator  Boolean @default(false)
+
+  permissions permissions[] @default([read])
+  access      access        @default(level_2)
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String   @db.ObjectId
+
+  client       Client? @relation(fields: [client_email], references: [email], onDelete: Cascade)
+  client_email String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("association")
+}
+
+model Organization {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  photo   String? @default("")
+  name    String
+  website String
+  address String  @default("")
+  bio     String
+
+  company    Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String  @db.ObjectId
+
+  organization_token OrganizationToken[]
+
+  user User[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+model OrganizationToken {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  api_key      String
+  redirect_url String?
+  origins      String[] @default([])
+  template     String   @default("classic")
+
+  two_factor_type          two_factor_type[]         @default([])
+  verify_registration      Boolean                   @default(true)
+  verify_registration_type verify_registration_type? @default(mail_link)
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String   @db.ObjectId
+
+  permissions permissions[] @default([read])
+  scope       scope[]       @default([manual])
+  user        User[]
+
+  organization    Organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  organization_id String        @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("organizationtokens")
+}
+
+model AppKey {
+  id  String @id @default(auto()) @map("_id") @db.ObjectId
+  key String @unique
+
+  company Company?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("appkeys")
+}
+
+model ServiceMail {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  company_name String
+  verified     Boolean @default(false)
+  website      String
+  email        String  @unique
+  photo        String?
+  username     String
+  password     String
+  host         String
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String?  @unique @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("servicemails")
+}
+
+model Wallet {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  amount Int @default(0)
+
+  company Company?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+model Card {
+  id                 String  @id @default(auto()) @map("_id") @db.ObjectId
+  authorization_code String
+  first_6digit       String
+  last_4digit        String
+  exp_month          String
+  exp_year           String
+  country_code       String
+  card_type          String
+  bank               String?
+  account_name       String?
+  signature          String  @unique
+
+  company       Company @relation(fields: [company_email], references: [email], onDelete: Cascade)
+  company_email String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("cards")
+}
+
+model AuthorizationToken {
+  id        String          @id @default(auto()) @map("_id") @db.ObjectId
+  type      two_factor_type @default(app)
+  token     String?
+  reference String          @unique
+  purpose   String
+  email     String
+  used      Boolean         @default(false)
+
+  user_type user_type
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String?  @db.ObjectId
+
+  expire_at Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("authorizationtoken")
+}
+
+model Transaction {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  amount  Int    @default(0)
+  type    String
+  purpose String
+
+  status    String? @default("pending")
+  reference String  @unique
+
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company_id String   @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("transaction")
+}
+
+model Google {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("googles")
+}
+
+model Facebook {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("facebooks")
+}
+
+model Sms {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+  token      String?
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("smses")
+}
+
+model Mail {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+  token      String?
+  user       User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("mails")
+}
+
+model TwoFactor {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("twofactors")
+}
+
+model Manual {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  purpose    auth    @default(login)
+  ip_address String? @default("")
+  company_id String  @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  client    Client? @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  client_id String? @db.ObjectId
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId String? @db.ObjectId
+
+  @@map("manuals")
+}
+
+model Blog {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  photo     String
+  title     String
+  sub_title String
+  url       String @unique
+  content   String
+
+  admin    Admin?  @relation(fields: [admin_id], references: [id])
+  admin_id String? @db.ObjectId
+
+  status status @default(active)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("blogs")
+}
+
+model Newsletter {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  email      String  @unique
+  ip_address String? @default("")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("newsletters")
+}
