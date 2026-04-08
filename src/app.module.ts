@@ -17,6 +17,7 @@ import { SmsModule } from './sms/sms.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { UserModule } from './user/user.module';
     AdminModule,
     ClientModule,
     AccountModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
