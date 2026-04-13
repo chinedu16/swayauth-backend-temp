@@ -107,6 +107,11 @@ model User {
   mail       Mail[]
   two_factor TwoFactor[]
   manual     Manual[]
+  password_reset PasswordReset[]
+
+  oAuthSessions OAuthSession[]
+  oAuthAuthorizationCodes OAuthAuthorizationCode[]
+  oAuthRefreshTokens OAuthRefreshToken[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -302,6 +307,8 @@ model OrganizationToken {
 
   organization    Organization? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   organization_id String        @db.ObjectId
+
+  password_reset PasswordReset[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -571,4 +578,157 @@ model Newsletter {
   updated_at DateTime @updatedAt
 
   @@map("newsletters")
+}
+
+model OAuthSession {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  client_id String @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  organization_id       String? @db.ObjectId
+  organization_token_id String? @db.ObjectId
+  company_id            String? @db.ObjectId
+
+  device_fingerprint_hash String
+  ip_address              String?
+  user_agent              String?
+  csrf_token_hash         String
+
+  revoked_at DateTime?
+  last_seen DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  oAuthRefreshTokens OAuthRefreshToken[]
+
+  @@map("oauth_sessions")
+  @@index([client_id, user_id])
+}
+
+model OAuthAuthorizationCode {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  code_hash String @unique
+  client_id String @db.ObjectId
+
+  redirect_uri String
+  scope        String[] @default([])
+
+  code_challenge        String
+  code_challenge_method String @default("S256")
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  organization_id       String? @db.ObjectId
+  organization_token_id String? @db.ObjectId
+  company_id            String? @db.ObjectId
+
+  ip_address String?
+  user_agent String?
+
+  expires_at DateTime
+  used_at    DateTime?
+  revoked_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("oauth_authorization_codes")
+  @@index([client_id, user_id])
+}
+
+model OAuthRefreshToken {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  token_hash String @unique
+  client_id  String @db.ObjectId
+
+  session    OAuthSession? @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  session_id String        @db.ObjectId
+
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  expires_at DateTime
+  revoked_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("oauth_refresh_tokens")
+  @@index([client_id, user_id, session_id])
+}
+
+model OAuthRevokedAccessToken {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  jti       String @unique
+  client_id String? @db.ObjectId
+  user_id   String? @db.ObjectId
+  exp       Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("oauth_revoked_access_tokens")
+  @@index([exp])
+}
+
+model OAuthAuditLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  action   String
+  success  Boolean @default(false)
+  reason   String?
+  client_id String? @db.ObjectId
+  user_id   String? @db.ObjectId
+
+  organization_id       String? @db.ObjectId
+  organization_token_id String? @db.ObjectId
+  company_id            String? @db.ObjectId
+
+  ip_address String?
+  user_agent String?
+
+  metadata Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("oauth_audit_logs")
+  @@index([action, created_at])
+  @@index([client_id, user_id])
+}
+
+model PasswordReset {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  token_hash String @unique
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id String? @db.ObjectId
+
+  organization_token       OrganizationToken? @relation(fields: [organization_token_id], references: [id], onDelete: Cascade)
+  organization_token_id    String?            @db.ObjectId
+
+  email String
+  purpose String @default("password_reset")
+  
+  ip_address String?
+  user_agent String?
+
+  expires_at DateTime
+  used_at    DateTime?
+  revoked_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("password_resets")
+  @@index([email, expires_at])
+  @@index([user_id, expires_at])
 }

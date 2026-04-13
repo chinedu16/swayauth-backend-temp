@@ -18,6 +18,8 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { HealthModule } from './health/health.module';
+import { OAuthModule } from './oauth/oauth.module';
+import { DashboardController } from './dashboard.controller';
 
 @Module({
   imports: [
@@ -45,6 +47,8 @@ import { HealthModule } from './health/health.module';
     ClientModule,
     AccountModule,
     HealthModule,
+    OAuthModule,
   ],
+  controllers: [DashboardController],
 })
 export class AppModule {}

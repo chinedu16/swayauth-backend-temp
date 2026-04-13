@@ -1,0 +1,559 @@
+openapi: 3.0.0
+info:
+  title: SwayAuth OAuth 2.0 API
+  version: 1.0.0
+  description: Comprehensive OAuth 2.0 Authentication Service with PKCE, Token Management, and Password Reset
+  contact:
+    name: SwayAuth Support
+    email: support@swayauth.com
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.swayauth.com/v1/oauth
+    description: Production Server
+  - url: http://localhost:8000/v1/oauth
+    description: Development Server
+
+paths:
+  /authorize:
+    post:
+      summary: OAuth 2.0 Authorization Endpoint (Authorization Code Flow)
+      description: |
+        Initiates the authorization code flow with PKCE support.
+        
+        **Security Requirements:**
+        - PKCE with S256 method is REQUIRED
+        - Authorization code expires in 10 minutes
+        - Single-use tokens enforced
+        
+        **Flow:**
+        1. Client authenticates user with email/password
+        2. Validates PKCE code_challenge
+        3. Returns authorization code and state
+      operationId: authorize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: string
+                  description: OAuth client identifier (OrganizationToken ID)
+                  example: org-token-1
+                redirect_uri:
+                  type: string
+                  format: uri
+                  description: Registered redirect URI for authorization code
+                  example: https://example.com/callback
+                code_challenge:
+                  type: string
+                  description: PKCE code challenge (base64url-encoded SHA256 hash of code_verifier)
+                  example: E9Mrozoa2owWoUgT60SVlcul_Z2umRmFkBMMXV5EN5s
+                code_challenge_method:
+                  type: string
+                  enum: ['S256']
+                  default: S256
+                  description: PKCE method (only S256 supported)
+                state:
+                  type: string
+                  description: Opaque state value to prevent CSRF
+                  example: state123
+                scope:
+                  type: string
+                  description: Space-separated list of scopes (optional)
+                  example: "read write"
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                  example: user@example.com
+                password:
+                  type: string
+                  description: User password
+                  example: password123
+              required:
+                - client_id
+                - redirect_uri
+                - code_challenge
+                - email
+                - password
+      responses:
+        '302':
+          description: Redirect to client with authorization code
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Redirect URI with authorization code and state
+              example: "https://example.com/callback?code=abc123&state=state123"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              examples:
+                invalid_client:
+                  value:
+                    error: invalid_client
+                    error_description: Unknown client_id
+                invalid_request:
+                  value:
+                    error: invalid_request
+                    error_description: Invalid redirect_uri
+
+  /token:
+    post:
+      summary: OAuth 2.0 Token Endpoint
+      description: |
+        Exchanges authorization code for tokens or refreshes access token.
+        
+        **Grant Types:**
+        1. authorization_code - Exchange auth code for tokens
+        2. refresh_token - Refresh expired access token
+        
+        **Security:**
+        - RS256 JWT signing
+        - Access tokens expire: 15-60 minutes
+        - Refresh tokens expire: 7-30 days
+        - Refresh tokens stored in HTTP-only cookies
+        - Device fingerprinting for session binding
+        - CSRF token validation
+      operationId: token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/TokenRequestAuthCode'
+                - $ref: '#/components/schemas/TokenRequestRefresh'
+      responses:
+        '200':
+          description: Token response
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: HTTP-only cookies for refresh token and session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /revoke:
+    post:
+      summary: Token Revocation Endpoint (RFC 7009)
+      description: |
+        Revoke access tokens or refresh tokens.
+        
+        **Behavior:**
+        - Access token: Stored in revocation list (JTI-based)
+        - Refresh token: Marked as revoked, invalidates session
+        - Revocation is idempotent (always returns 200)
+      operationId: revoke
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Token to revoke (or from HTTP-only cookie)
+                  example: eyJhbGciOiJSUzI1NiIs...
+                token_type_hint:
+                  type: string
+                  enum: ['access_token', 'refresh_token']
+                  default: refresh_token
+              required:
+                - token
+      responses:
+        '200':
+          description: Token revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                example: {}
+        '400':
+          description: Invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /introspect:
+    post:
+      summary: Token Introspection Endpoint (RFC 7662)
+      description: |
+        Introspect access tokens to validate and retrieve claims.
+        
+        **Returns:**
+        - Token activity status (active/inactive)
+        - User information
+        - Scopes and permissions
+        - Expiration time
+      operationId: introspect
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Token to introspect
+              required:
+                - token
+      responses:
+        '200':
+          description: Token introspection result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntrospectionResponse'
+
+  /register:
+    post:
+      summary: User Registration Endpoint
+      description: |
+        Register a new user within an organization.
+        
+        **Security:**
+        - Email must be unique within organization
+        - Password hashed with Argon2
+        - IP address and User-Agent logged
+        - Optional email verification
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email
+                  example: newuser@example.com
+                password:
+                  type: string
+                  description: Password (minimum 8 characters)
+                  example: SecurePass123!
+                first_name:
+                  type: string
+                  description: User first name (optional)
+                last_name:
+                  type: string
+                  description: User last name (optional)
+                phone:
+                  type: string
+                  description: User phone number (optional)
+                client_id:
+                  type: string
+                  description: Organization token ID
+              required:
+                - email
+                - password
+                - client_id
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user_id:
+                    type: string
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+  /password-reset/request:
+    post:
+      summary: Request Password Reset
+      description: |
+        Request a password reset token.
+        
+        **Security:**
+        - Token expires in 15 minutes
+        - Email sent only if user exists (security best practice)
+        - Reset token single-use only
+        - IP address logged
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                client_id:
+                  type: string
+                  description: Organization token ID
+              required:
+                - email
+                - client_id
+      responses:
+        '200':
+          description: Password reset requested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /password-reset/verify:
+    post:
+      summary: Verify Password Reset Token
+      description: |
+        Verify if a password reset token is valid and not expired.
+      operationId: verifyPasswordResetToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                reset_token:
+                  type: string
+                client_id:
+                  type: string
+              required:
+                - email
+                - reset_token
+                - client_id
+      responses:
+        '200':
+          description: Token verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  error:
+                    type: string
+
+  /password-reset/confirm:
+    post:
+      summary: Reset Password
+      description: |
+        Reset user password using a valid reset token.
+        
+        **Security:**
+        - Revokes all existing tokens/sessions (logout all devices)
+        - Password hashed with Argon2
+        - Token marked as used (single-use)
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                new_password:
+                  type: string
+                  description: New password (minimum 8 characters)
+                reset_token:
+                  type: string
+                client_id:
+                  type: string
+              required:
+                - email
+                - new_password
+                - reset_token
+                - client_id
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
+components:
+  schemas:
+    TokenRequestAuthCode:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: ['authorization_code']
+          example: authorization_code
+        client_id:
+          type: string
+        redirect_uri:
+          type: string
+          format: uri
+        code:
+          type: string
+          description: Authorization code from /authorize endpoint
+        code_verifier:
+          type: string
+          description: PKCE code verifier
+      required:
+        - grant_type
+        - client_id
+        - redirect_uri
+        - code
+        - code_verifier
+
+    TokenRequestRefresh:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: ['refresh_token']
+          example: refresh_token
+        client_id:
+          type: string
+        refresh_token:
+          type: string
+          description: Refresh token (from Set-Cookie or body)
+      required:
+        - grant_type
+        - client_id
+        - refresh_token
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        token_type:
+          type: string
+          enum: ['Bearer']
+        expires_in:
+          type: integer
+          description: Token expiration in seconds
+        scope:
+          type: string
+          description: Granted scopes
+      required:
+        - access_token
+        - token_type
+        - expires_in
+
+    IntrospectionResponse:
+      type: object
+      properties:
+        active:
+          type: boolean
+          description: Token validity status
+        scope:
+          type: string
+          description: Granted scopes
+        client_id:
+          type: string
+        username:
+          type: string
+        sub:
+          type: string
+          description: Subject (user ID)
+        exp:
+          type: integer
+          description: Expiration time (Unix timestamp)
+        iat:
+          type: integer
+          description: Issued at time (Unix timestamp)
+
+    OAuthError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: OAuth 2.0 error code
+          enum:
+            - invalid_request
+            - invalid_client
+            - invalid_grant
+            - invalid_scope
+            - unauthorized_client
+            - unsupported_grant_type
+            - unsupported_response_type
+            - server_error
+            - temporarily_unavailable
+            - access_denied
+            - interaction_required
+        error_description:
+          type: string
+          description: Human-readable error description
+        error_uri:
+          type: string
+          format: uri
+          description: URI with additional error information
+      required:
+        - error
+
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OAuth 2.0 Bearer Token
+
+  headers:
+    X-Device-Fingerprint:
+      schema:
+        type: string
+      description: Device fingerprint for session binding
+    X-CSRF-Token:
+      schema:
+        type: string
+      description: CSRF token for token refresh operations
+
+security:
+  - BearerToken: []
+
+tags:
+  - name: Authorization
+    description: OAuth 2.0 authorization flow
+  - name: Token
+    description: Token management endpoints
+  - name: User
+    description: User registration and password management

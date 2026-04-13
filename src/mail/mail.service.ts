@@ -227,6 +227,27 @@ export class MailService {
     });
   }
 
+  async sendPasswordReset(params: {
+    to: string;
+    reset_token: string;
+    user_name: string;
+    reset_url: string;
+  }) {
+    return this.sendMail({
+      to: params.to,
+      subject: 'Password Reset Request',
+      template: 'reset-password',
+      token: params.reset_token,
+      first_name: params.user_name,
+      company_id: process.env.SWAYAUTH_COMPANY_ID || '',
+      domain: process.env.FRONTEND_URL || '',
+      expire: '15 minutes',
+      host: process.env.SMTP_HOST || '',
+      password: process.env.SMTP_PASSWORD || '',
+      username: process.env.SMTP_USERNAME || '',
+    });
+  }
+
   async renderTemplate(templatePath: string, data: { [key: string]: any }) {
     let renderedTemplate = '';
     const candidates = [
