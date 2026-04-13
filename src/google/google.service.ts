@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   GatewayTimeoutException,
   Injectable,
   NotFoundException,

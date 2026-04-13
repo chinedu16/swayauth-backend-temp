@@ -3,6 +3,7 @@ import { CompanyCardsController } from './controller/cards.controller';
 import { CompanyCredentialsController } from './controller/credentials.controller';
 import { CompanyEmailController } from './controller/email.controller';
 import { CompanyOrganizationsController } from './controller/organizations.controller';
+import { PublicOrganizationTokensController } from './controller/public-organization-tokens.controller';
 import { CompanyStatisticsController } from './controller/statistics.controller';
 import { CompanyTeamController } from './controller/team.controller';
 import { CompanyTransactionsController } from './controller/transactions.controller';
@@ -35,6 +36,7 @@ import { TransactionService } from './service/transaction.service';
     CompanyCardsController,
     CompanyCredentialsController,
     CompanyOrganizationsController,
+    PublicOrganizationTokensController,
     CompanyStatisticsController,
     CompanyTeamController,
     CompanyTransactionsController,

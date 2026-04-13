@@ -5,7 +5,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { CONST } from '../../common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthType } from '../type';
 

@@ -13,14 +13,14 @@ export const getNamedServer = (output: string) => {
   return output.substring(pos + 13, end - 1);
 };
 
-export const domainNameServer = async (domain: string) => {
+export const domainNameServer = async () => {
   const shell = await terminal('nslookup -type=NS swayauth.com');
   return getNamedServer(shell);
 };
 
 export const verifyAwsTxtRecord = async (domain: string) => {
   try {
-    const nameServer = await domainNameServer(domain);
+    const nameServer = await domainNameServer();
     const shell = await terminal(
       `nslookup -type=TXT _amazonses.${domain} ${nameServer}`,
     );

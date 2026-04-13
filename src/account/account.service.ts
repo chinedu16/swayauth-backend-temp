@@ -250,7 +250,7 @@ export class AccountService {
         data: { ...rest, ip_address },
       });
     } else {
-      if (dto.company_name || dto.company_bio) {
+      if (company_name || company_bio) {
         if (jwt.access === 'level_3') {
           await this.prisma.company.update({
             where: {
@@ -258,8 +258,8 @@ export class AccountService {
               email: jwt.email,
             },
             data: {
-              name: dto.company_name,
-              bio: dto.company_bio,
+              name: company_name,
+              bio: company_bio,
             },
           });
         } else {

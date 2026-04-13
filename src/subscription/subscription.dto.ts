@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsEnum } from 'class-validator';
 
 export enum PlanEnum {
   standard = 'standard',

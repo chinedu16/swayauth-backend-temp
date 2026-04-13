@@ -25,11 +25,11 @@ export const reportErrorToSlack = (data: any) => {
       ],
       channel: process.env.SLACK_CHANNEL_ID,
     })
-    .catch(async (err) => {
+    .catch(async () => {
       // console.log(err, 'postMessage')
       web.conversations
         .join({ channel: process.env.SLACK_CHANNEL_ID as string })
-        .catch((err) => {
+        .catch(() => {
           // console.log(err, 'join')
         });
     });

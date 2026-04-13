@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
 import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()

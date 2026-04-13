@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuthorizationToken, Company } from '@prisma/client';
+import { Company } from '@prisma/client';
 import { MailService } from 'src/mail/mail.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -200,9 +200,8 @@ export class CompanyEmailService {
 
   async verifySMTP(dto: SmtpVerifyDto, company: Company) {
     try {
-      let authToken: AuthorizationToken;
       const ref = verifyReference(dto.reference);
-      authToken = await this.prisma.authorizationToken.update({
+      await this.prisma.authorizationToken.update({
         where: {
           reference: dto.reference,
           token: dto.token,

@@ -9,7 +9,6 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
-  MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { DirectionEnum } from 'src/common/dto/base';

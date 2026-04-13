@@ -25,10 +25,8 @@ export class SmsService {
     },
     checkSubscription: boolean = true,
   ) {
-    // if (checkSubscription) {
-    //   if (!await this.subscription.allowUserRegistration(company_id))
-    //     return { status: false, message: 'Subscription service has expired or exceeded sms limit' }
-    // }
+    void company_id;
+    void checkSubscription;
     const url = CONST.SEND_SMS_URL;
 
     try {

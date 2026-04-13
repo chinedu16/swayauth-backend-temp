@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Company, Organization, OrganizationToken } from '@prisma/client';
 import { CONST, genOrgToken } from '../../common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -251,5 +247,35 @@ export class OrganizationsService {
       },
     });
     return { message: 'Organization deleted successfully' };
+  }
+
+  async getOrganizationTokenPublic(id: string) {
+    const token = await this.prisma.organizationToken.findFirst({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        redirect_url: true,
+        origins: true,
+        template: true,
+        two_factor_type: true,
+        verify_registration: true,
+        verify_registration_type: true,
+        permissions: true,
+        scope: true,
+        organization: {
+          select: {
+            id: true,
+            photo: true,
+            name: true,
+            website: true,
+            address: true,
+            bio: true,
+          },
+        },
+      },
+    });
+    if (!token) throw new NotFoundException('Record not found');
+    return { data: token };
   }
 }

@@ -62,7 +62,7 @@ export const createReference = (
 };
 
 export const verifyReference = <
-  T extends any,
+  T,
   U extends {
     id: string;
     token: string;
