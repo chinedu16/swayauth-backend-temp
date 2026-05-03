@@ -236,12 +236,30 @@ export class MailService {
     return this.sendMail({
       to: params.to,
       subject: 'Password Reset Request',
-      template: 'reset-password',
-      token: params.reset_token,
+      template: 'forgot-password',
+      token: params.reset_url,
+      tokenType: false,
       first_name: params.user_name,
       company_id: process.env.SWAYAUTH_COMPANY_ID || '',
       domain: process.env.FRONTEND_URL || '',
       expire: '15 minutes',
+      host: process.env.SMTP_HOST || '',
+      password: process.env.SMTP_PASSWORD || '',
+      username: process.env.SMTP_USERNAME || '',
+    });
+  }
+
+  async sendPasswordResetConfirmation(params: {
+    to: string;
+    user_name: string;
+  }) {
+    return this.sendMail({
+      to: params.to,
+      subject: 'Password Reset Successful',
+      template: 'reset-password',
+      first_name: params.user_name,
+      company_id: process.env.SWAYAUTH_COMPANY_ID || '',
+      domain: process.env.FRONTEND_URL || '',
       host: process.env.SMTP_HOST || '',
       password: process.env.SMTP_PASSWORD || '',
       username: process.env.SMTP_USERNAME || '',

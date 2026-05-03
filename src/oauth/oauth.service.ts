@@ -13,12 +13,7 @@ import { OAuthGrantType, OAuthTokenDto } from './dto/oauth.dto';
 import crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { SmsService } from '../sms/sms.service';
-import {
-  Decrypt,
-  createReference,
-  expireIn,
-  gen6digit,
-} from '../common';
+import { Decrypt, createReference, expireIn, gen6digit } from '../common';
 
 type OAuthError = {
   status: number;
@@ -834,11 +829,13 @@ export class OAuthService {
       if (!user.verified) {
         const time = expireIn(60 * 24);
         const verificationToken = gen6digit().toString();
-        const reference = createReference(user.id, 60 * 24, 'register', { token: verificationToken });
+        const reference = createReference(user.id, 60 * 24, 'register', {
+          token: verificationToken,
+        });
 
         const organization = await this.prisma.organization.findFirst({
           where: { id: token.organization_id },
-          include: { company: { include: { service_email: true } } }
+          include: { company: { include: { service_email: true } } },
         });
 
         await this.prisma.manual.create({
@@ -856,7 +853,9 @@ export class OAuthService {
           template: 'register',
           company_id: token.company_id,
           first_name: user.first_name,
-          image: organization.photo || organization?.company?.service_email?.[0]?.photo,
+          image:
+            organization.photo ||
+            organization?.company?.service_email?.[0]?.photo,
           time: '24 hours',
           location: organization?.address,
           domain: organization?.website,
@@ -868,7 +867,9 @@ export class OAuthService {
             ...mailObject,
             from: organization?.company?.service_email?.[0]?.email,
             username: organization?.company?.service_email?.[0]?.username,
-            password: Decrypt(organization?.company?.service_email?.[0]?.password),
+            password: Decrypt(
+              organization?.company?.service_email?.[0]?.password,
+            ),
             host: organization?.company?.service_email?.[0]?.host,
             image: organization?.company?.service_email?.[0]?.photo,
           };
@@ -877,7 +878,9 @@ export class OAuthService {
         const type = token.verify_registration_type;
         const redirect_url = token.redirect_url;
         const tokenType = redirect_url && type == 'mail_link' ? false : true;
-        const link = redirect_url + `?token=${verificationToken}&reference=${reference}&intent=register`;
+        const link =
+          redirect_url +
+          `?token=${verificationToken}&reference=${reference}&intent=register`;
 
         if (type != 'sms' || (type == 'sms' && !user.phone)) {
           mailObject = {
@@ -928,9 +931,34 @@ export class OAuthService {
             expire_at: time,
           },
         });
+
+        return {
+          success: true,
+          message: 'Registered',
+          data: {
+            registered: true,
+            verification: true,
+            verification_type:
+              type == 'sms' && params.phone
+                ? 'sms'
+                : tokenType
+                  ? 'mail_token'
+                  : 'mail_link',
+            reference: reference,
+            user_id: user.id,
+          },
+        };
       }
 
-      return { success: true, user_id: user.id };
+      return {
+        success: true,
+        message: 'Registered',
+        data: {
+          registered: true,
+          verification: false,
+          user_id: user.id,
+        },
+      };
     } catch (error: any) {
       await this.audit({
         action: 'oauth_register',
@@ -942,7 +970,11 @@ export class OAuthService {
         req: params.req,
       });
       console.error('Registration error:', error);
-      return this.oauthError(500, 'server_error', `Registration failed: ${error.message}`);
+      return this.oauthError(
+        500,
+        'server_error',
+        `Registration failed: ${error.message}`,
+      );
     }
   }
 
@@ -1012,7 +1044,7 @@ export class OAuthService {
           to: user.email,
           reset_token: resetToken,
           user_name: `${user.first_name} ${user.last_name}`,
-          reset_url: `${process.env.FRONTEND_URL}/password-reset?token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(user.email)}`,
+          reset_url: `${process.env.FRONTEND_URL}/password-reset?token=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(user.email)}&app_id=${encodeURIComponent(params.client_id)}&template=${encodeURIComponent(token.template || 'classic')}`,
         });
       } catch (error: any) {
         console.error('Failed to send password reset email:', error);
@@ -1065,17 +1097,20 @@ export class OAuthService {
       `${params.reset_token}.${this.requireEnv('OAUTH_PASSWORD_RESET_PEPPER')}`,
     );
 
-    const resetRecord = await this.prisma.passwordReset.findFirst({
+    const resetRecord = await this.prisma.passwordReset.findUnique({
       where: {
         token_hash: tokenHash,
-        email: params.email,
-        organization_token_id: token.id,
-        used_at: null,
-        revoked_at: null,
       },
     });
 
-    if (!resetRecord || resetRecord.expires_at.getTime() < Date.now()) {
+    if (
+      !resetRecord ||
+      resetRecord.email.toLowerCase() !== params.email.toLowerCase() ||
+      resetRecord.organization_token_id !== token.id ||
+      resetRecord.used_at ||
+      resetRecord.revoked_at ||
+      resetRecord.expires_at.getTime() < Date.now()
+    ) {
       await this.audit({
         action: 'oauth_password_reset_verify',
         success: false,
@@ -1119,17 +1154,20 @@ export class OAuthService {
       `${params.reset_token}.${this.requireEnv('OAUTH_PASSWORD_RESET_PEPPER')}`,
     );
 
-    const resetRecord = await this.prisma.passwordReset.findFirst({
+    const resetRecord = await this.prisma.passwordReset.findUnique({
       where: {
         token_hash: tokenHash,
-        email: params.email,
-        organization_token_id: token.id,
-        used_at: null,
-        revoked_at: null,
       },
     });
 
-    if (!resetRecord || resetRecord.expires_at.getTime() < Date.now()) {
+    if (
+      !resetRecord ||
+      resetRecord.email.toLowerCase() !== params.email.toLowerCase() ||
+      resetRecord.organization_token_id !== token.id ||
+      resetRecord.used_at ||
+      resetRecord.revoked_at ||
+      resetRecord.expires_at.getTime() < Date.now()
+    ) {
       await this.audit({
         action: 'oauth_password_reset',
         success: false,
@@ -1183,6 +1221,21 @@ export class OAuthService {
         organization_token_id: token.id,
         req: params.req,
       });
+
+      // Send confirmation email
+      try {
+        const user = await this.prisma.user.findFirst({
+          where: { id: resetRecord.user_id || '' },
+        });
+        if (user) {
+          await this.mail.sendPasswordResetConfirmation({
+            to: user.email,
+            user_name: `${user.first_name} ${user.last_name}`,
+          });
+        }
+      } catch (error: any) {
+        console.error('Failed to send password reset confirmation:', error);
+      }
 
       return { success: true };
     } catch (error: any) {
